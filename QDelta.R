@@ -313,7 +313,8 @@ Qdelta <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
   # Plot distribution of generation interval length density curves of each simulation and the theoretical exp
   p1 <- ggplot(genbysim, aes(x = generation, color = simnumb)) +
     geom_density(linewidth = 1.2) +
-    geom_line(data = theoretical, aes(x = time, y = pdf), color = "black", linetype = "longdash", linewidth = 1.2) +
+    geom_line(data = theoretical, aes(x = time, y = pdf), color = "grey", linetype = "longdash", linewidth = 1.2) +
+    geom_density(data = theoretical, aes(x = dist), color = "black", linetype = "longdash", linewidth = 1.2) +
     theme_minimal() +
     labs(
       title = "Delta Density of Generation Intervals Distribution by Simulation",
