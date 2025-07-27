@@ -7,7 +7,7 @@ library(viridis)
 library(ggridges)
 
 # Note: simulation isolated in sims.R
-Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
+Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
   
   # PARAMETERS:
   # iterations - number of overall simulations performed
@@ -172,85 +172,14 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
       
       # END QUEUE  ----------------------------------------------------------------------------------------------------------------------------
       
-      # DRAW + APPLY IIP (PWISE) ==============================================================================================================
+      # DRAW + APPLY IIP (PUNCT) ==============================================================================================================
       
-      tau1 = rexp(1,recoveryrate) + inittime # adjusted for initcohort timing exp dist of factor of IIP -> this case timing of infection
-      tau2 = tau1 + rexp(1,recoveryrate)
-      ###print(paste0("The IIP for init cohort individual ", i, " is determined by tau1 = ", tau1, " and tau2 = ", tau2," which is adjusted by init cohort timing."))
+      tau = rexp(1,recoveryrate) + inittime # adjusted for initcohort timing exp dist of factor of IIP -> this case timing of infection
+      ###print(paste0("The IIP for init cohort individual ", i, " is determined by tau = ", tau, " which is adjusted by init cohort timing."))
       
-      # Iterate through Queue output to determine who overlaps with infectiousness period and when
-      interacts = data.frame()
-      for (n in 1:nrow(queuedata)){
-        if (queuedata[n,2] < tau1){ # strictly less than for type 2 vs. 4
-          if (queuedata[n,4] <= tau1){
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " for initcohort member ", i, " did not overlap with the infectiousness period (type 1)."))
-            next
-          } else if (queuedata[n,4] < tau2){ # strictly less than for type 2 vs. 3
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " for initcohort member ", i, " did overlap with the infectiousness period."))
-            overlap = queuedata[n,4] - tau1
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " overlapped for ", overlap, " time units (type 2)."))
-            addnew = data.frame(
-              newpersonid = queuedata[n, 1],
-              overlap = overlap,
-              overlap_start = tau1,
-              overlap_end = queuedata[n, 4]
-            )
-            #print(addnew)
-            interacts <- rbind(interacts, addnew)
-            next
-          } else if (queuedata[n,4] >= tau2){ 
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " for initcohort member ", i, " did overlap with the infectiousness period."))
-            overlap = tau2 - tau1
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " overlapped for ", overlap, " time units (type 3)."))
-            addnew = data.frame(
-              newpersonid = queuedata[n, 1],
-              overlap = overlap,
-              overlap_start = tau1, 
-              overlap_end = tau2  
-            )
-            #print(addnew)
-            interacts <- rbind(interacts, addnew)
-            next
-          } else {
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], "did not meet first 3 types."))
-          }
-        } else if (queuedata[n,2] < tau2){ # this is strictly less than for type 6
-          if (queuedata[n,4] <= tau2){
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " for initcohort member ", i, " did overlap with the infectiousness period."))
-            overlap = queuedata[n,4] - queuedata[n,2]
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " overlapped for ", overlap, " time units (type 4)."))
-            addnew = data.frame(
-              newpersonid = queuedata[n, 1],
-              overlap = overlap,
-              overlap_start = queuedata[n,2],  
-              overlap_end = queuedata[n, 4]  
-            )
-            #print(addnew)
-            interacts <- rbind(interacts, addnew)
-            next
-          } else if (queuedata[n,4] > tau2){
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " for initcohort member ", i, " did overlap with the infectiousness period."))
-            overlap = tau2 - queuedata[n,2]
-            ###print(paste0("Queue Person ID: ", queuedata[n,1], " overlapped for ", overlap, " time units (type 5)."))
-            addnew = data.frame(
-              newpersonid = queuedata[n, 1],
-              overlap = overlap,
-              overlap_start = queuedata[n,2],  
-              overlap_end = tau2  
-            )
-            #print(addnew)
-            interacts <- rbind(interacts, addnew)
-            next
-          }
-        } else { # (queuedata[n,2] >= tau2) => (queuedata[n,4] > tau2)
-          ###print(paste0("Queue Person ID: ", queuedata[n,1], " for initcohort member ", i, " did not overlap with the infectiousness period (type 6)."))
-          next
-        }
-      }
-      ###print(interacts)
-      
-      # PART 2 - APPLY SURVIVAL ANALYSIS TO QUEUEDATA
-      # if no resulting interactions, go to next loop...
+  
+      # APPLY SURVIVAL ANALYSIS TO QUEUEDATA
+      # Everyone is considered to have interacted right?
       if (nrow(interacts) == 0){
         ###print(paste0("NOTE: No infectious interactions for initcohort member ", i, " so moving on..."))
         next
@@ -288,24 +217,24 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
         ###print(paste0("WARNING: Initcohort ", i, " had no secondary infection contacts produced so moving on..."))
         next
       } else {
-      # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-      
-      # Data Wrangling __________________________________________________________________________________________________________________________
-      names(contactdata) <- c('icmnumber','icmtime','secondinfecttime','genint') # insert names in contactdata
-      contactdata <- contactdata[!is.na(contactdata$genint), ] # remove NA to prevent bugs
-      contactdata <- contactdata[order(contactdata$genint, decreasing = FALSE),] # order based on timing of generation interval length 
-      gidata = contactdata$genint # extract the generation interval data
-      namedintervals <- data.frame() # create data frame to input each simulation name to gi data that resets each sim
-      if (length(gidata) == 0){
-        #print(paste0("NOTE: In simulation number ", k," person ", i," did not produce any secondary infections!"))
-        next
-      } else {
-        namedintervals <- data.frame( # append simulation group
-          generation = gidata,
-          simnumb = paste0("sim_", k),
-          stringsAsFactors = FALSE
-        ) 
-      }
+        # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        
+        # Data Wrangling __________________________________________________________________________________________________________________________
+        names(contactdata) <- c('icmnumber','icmtime','secondinfecttime','genint') # insert names in contactdata
+        contactdata <- contactdata[!is.na(contactdata$genint), ] # remove NA to prevent bugs
+        contactdata <- contactdata[order(contactdata$genint, decreasing = FALSE),] # order based on timing of generation interval length 
+        gidata = contactdata$genint # extract the generation interval data
+        namedintervals <- data.frame() # create data frame to input each simulation name to gi data that resets each sim
+        if (length(gidata) == 0){
+          #print(paste0("NOTE: In simulation number ", k," person ", i," did not produce any secondary infections!"))
+          next
+        } else {
+          namedintervals <- data.frame( # append simulation group
+            generation = gidata,
+            simnumb = paste0("sim_", k),
+            stringsAsFactors = FALSE
+          ) 
+        }
       }
     }
     
@@ -384,7 +313,7 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
     geom_density(data = theoretical, aes(x = dist), color = "black", linetype = "longdash", linewidth = 1.2) +
     theme_minimal() +
     labs(
-      title = "PWise Density of Generation Intervals Distribution by Simulation",
+      title = "Punct Density of Generation Intervals Distribution by Simulation",
       x = "Generation Interval",
       y = "Density",
       color = "Simulation"
@@ -399,7 +328,7 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
     theme_ipsum() +
     theme() +
     labs(
-      title = "PWise Generation Interval Distributions by Simulation",
+      title = "Punct Generation Interval Distributions by Simulation",
       x = "Generation Interval Length",
       y = "Number of Secondary Infections"
     ) +
@@ -413,7 +342,7 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
     stat_bin(data = theoretical, aes(x = dist, y = after_stat(count / max(count))), fill = "black", color = NA, alpha = 0.4, binwidth = mybinsize, position = "identity") + # Normalize theoretical
     theme_ipsum() +
     labs(
-      title = "PWise Normalized Generation Interval Distributions by Simulation",
+      title = "Punct Normalized Generation Interval Distributions by Simulation",
       x = "Generation Interval",
       y = "Normalized Number of Secondary Infections"
     ) +
@@ -426,7 +355,7 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
     geom_histogram(data = theoretical, aes(x = dist, y = after_stat(density * width)), fill = "black", color = NA, alpha = 0.4, binwidth = mybinsize) +
     theme_ipsum() +
     labs(
-      title = "PWise Relative Generation Interval Distributions by Simulation",
+      title = "Punct Relative Generation Interval Distributions by Simulation",
       x = "Generation Interval",
       y = "Relative Secondary Infections"
     ) +

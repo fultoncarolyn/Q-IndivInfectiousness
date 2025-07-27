@@ -46,95 +46,95 @@ Qdelta <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
     
     for (i in 1:length(vector)){ # for each init cohort in vector run queue contact simulation
       
-# QUEUE ---------------------------------------------------------------------------------------------------------------------
-        # function which takes in arrival and departure rates with an initial population
-        # Initiate
-        queuedata <- data.frame()
-        timein <- 0
-        timeout <- 0
-        timespent <- 0
-        inittime <- vector[i]
-        # set init prox for each person
-        initprox <- floor(runif(1,min=0,max=maxprox))
-        
-        ###print(paste0("There are ", initprox, " person(s) initially in proximity to initcohort member ", i, " ." ))
-        
-        # Initial Proximity **************************************************************************************************************
-        if (initprox == 0){ # if no one initially in proximity skip
-          ###print(paste0("No one is included in the initial proximity."))
-        } else if (initprox > 0) { # if initially in proximity then...
-          for (x in 1:initprox){
-            arrives = 0 + inittime # initprox all arrive at time = 0
-            if (departrate == 0){ # if initprox can't leave set long departure
-              departs = maxtimeval + inittime
-              ###print(paste0("Person from initprox ", x, " arrived at time ", arrives, " and did NOT depart until ", departs, "."))
-            } else if (departrate > 0){ # if initprox can leave then...
-              departs = rexp(1, rate = 1/departrate) + inittime # exp dist departures by departrate (since others can leave too -> could eventually impose different rate for init vs pop)
-              ###print(paste0("Person from initprox ", x, " arrived at time ", arrives, " and departed at time ", departs, " (total time later)."))
-            } else {
-              stop("ERROR in departrate, must be >= 0")
-            }
-            # append results of initprox to queue
-            initoutcome = c(x,arrives,arrives,departs, departs)
-            queuedata <- rbind(queuedata, initoutcome)
+      # QUEUE ---------------------------------------------------------------------------------------------------------------------
+      # function which takes in arrival and departure rates with an initial population
+      # Initiate
+      queuedata <- data.frame()
+      inittime <- vector[i]
+      # set init prox for each person
+      initprox <- floor(runif(1,min=0,max=maxprox))
+      
+      ###print(paste0("There are ", initprox, " person(s) initially in proximity to initcohort member ", i, " ." ))
+      
+      # Initial Proximity **************************************************************************************************************
+      if (initprox == 0){ # if no one initially in proximity skip
+        ###print(paste0("No one is included in the initial proximity."))
+      } else if (initprox > 0) { # if initially in proximity then...
+        for (x in 1:initprox){
+          arrives = 0 + inittime # initprox all arrive at time = 0 -> could remove this element to optimize
+          if (departrate == 0){ # if initprox can't leave set long departure
+            departs = maxtimeval
+            ###print(paste0("Person from initprox ", x, " arrived at time ", arrives, " and did NOT depart until ", departs, "."))
+          } else if (departrate > 0){ # if initprox can leave then...
+            departs = rexp(1, rate = 1/departrate) + arrives # exp dist departures by departrate (since others can leave too -> could eventually impose different rate for init vs pop)
+            ###print(paste0("Person from initprox ", x, " arrived at time ", arrives, " and departed at time ", departs, " (total time later)."))
+          } else {
+            stop("ERROR in departrate, must be >= 0")
           }
-        } else {
-          stop("ERROR in initprox, must be >= 0")
+          # append results of initprox to queue
+          initoutcome = c(x,arrives,arrives,departs, departs)
+          queuedata <- rbind(queuedata, initoutcome)
         }
-        # ********************************************************************************************************************************
-        
-        # Dynamic Proximity ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if (arrivalrate == 0){ # if no one enters then skip (accounted for above with initprox)
-          ###print(paste0("No one from the population can enter proximity when arrivalrate is ", arrivalrate,"."))
-          if (initprox == 0){
-            stop("ERROR in arrivalrate = ", arrivalrate, " and initprox = ", initprox, " -> no queue produced because one can interact!")
-          }
-        } else if (arrivalrate > 0){ # if pop can enter then...
-          # for each pop member see when they arrive and depart
-          
-          index = initprox + 1
-          while (timein < maxtimeval){
-            arrival = rexp(1, rate = 1/arrivalrate) + inittime # define arrival exp distribution using arrivalrate
-            if (timein + arrival > maxtimeval){
-              ###print(paste0("ERROR in arrival, exceeds maxtimeval!"))
-              break
-            }
-            if (departrate == 0){ # if pop can't leave (but can enter) then define same late departure for all
-              departure = maxtimeval + inittime
-              ###print(paste0("Overall person ", index, " arrived ", arrival, " later and did NOT depart ", departure, "."))
-              # adjust time counts for departrate = 0
-              timein <- timein + arrival 
-              timeout <- departure
-              if (timeout > maxtimeval){
-                timeout <- maxtimeval
-              }
-              timespent <- departure - arrival
-            } else if (departrate > 0){ # if pop can leave then...
-              departure = rexp(1, rate = 1/departrate) + inittime # define departure distribution using departrate
-              ###print(paste0("Overall person ", index, " arrived ", arrival, " later and departed ", departure, " later."))
-              # adjust time counts for departrate > 0
-              timein <- timein + arrival 
-              timeout <- timein + departure
-              if (timeout > maxtimeval){
-                timeout <- maxtimeval
-              }
-              timespent <- departure
-            } else {
-              stop("ERROR in departrate")
-            }
-            ###print(paste0("Overall person number ", index, " arrived ", arrival, " later, which is at time ", timein, " and departed ", departure, " later, which is at time ", timeout, "."))
-            if (timein > timeout){
-              print(paste0("ERROR in last arrival, past maxtimeval!"))
-              break
-            }
-            # append outcomes to df
-            outcome = c(index,timein,arrival,timeout,timespent)
-            queuedata <- rbind(queuedata, outcome)
-            index <- index + 1
-          }
-        } else {
-          stop("ERROR in arrivalrate, must be >= 0")
+      } else {
+        stop("ERROR in initprox, must be >= 0")
+      }
+      # ********************************************************************************************************************************
+      
+      # Dynamic Proximity ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      timein <- inittime
+      timeout <- 0
+      timespent <- 0
+      if (arrivalrate == 0){ # if no one enters then skip (accounted for above with initprox)
+        ###print(paste0("No one from the population can enter proximity when arrivalrate is ", arrivalrate,"."))
+        if (initprox == 0){
+          stop("ERROR in arrivalrate = ", arrivalrate, " and initprox = ", initprox, " -> no queue produced because one can interact!")
         }
+      } else if (arrivalrate > 0){ # if pop can enter then...
+        # for each pop member see when they arrive and depart
+        
+        index = initprox + 1
+        while (timein < maxtimeval){
+          arrival = rexp(1, rate = 1/arrivalrate) # define arrival exp distribution using arrivalrate
+          if (timein + arrival > maxtimeval){
+            ###print(paste0("ERROR in arrival, exceeds maxtimeval!"))
+            break
+          }
+          if (departrate == 0){ # if pop can't leave (but can enter) then define same late departure for all
+            departure = maxtimeval
+            ###print(paste0("Overall person ", index, " arrived ", arrival, " later and did NOT depart ", departure, "."))
+            # adjust time counts for departrate = 0
+            timein <- timein + arrival 
+            timeout <- departure
+            if (timeout > maxtimeval){
+              timeout <- maxtimeval
+            }
+            timespent <- departure - arrival
+          } else if (departrate > 0){ # if pop can leave then...
+            departure = rexp(1, rate = 1/departrate) # define departure distribution using departrate
+            ###print(paste0("Overall person ", index, " arrived ", arrival, " later and departed ", departure, " later."))
+            # adjust time counts for departrate > 0
+            timein <- timein + arrival 
+            timeout <- timein + departure
+            if (timeout > maxtimeval){
+              timeout <- maxtimeval
+            }
+            timespent <- departure
+          } else {
+            stop("ERROR in departrate")
+          }
+          ###print(paste0("Overall person number ", index, " arrived ", arrival, " later, which is at time ", timein, " and departed ", departure, " later, which is at time ", timeout, "."))
+          if (timein > timeout){
+            print(paste0("ERROR in last arrival, past maxtimeval!"))
+            break
+          }
+          # append outcomes to df
+          outcome = c(index,timein,arrival,timeout,timespent)
+          queuedata <- rbind(queuedata, outcome)
+          index <- index + 1
+        }
+      } else {
+        stop("ERROR in arrivalrate, must be >= 0")
+      }
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         names(queuedata) <- c('newpersonid','arrivaltime','interarrival','departuretime','timespent')
         
