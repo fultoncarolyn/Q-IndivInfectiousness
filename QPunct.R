@@ -5,6 +5,7 @@ library(hrbrthemes)
 library(viridisLite)
 library(viridis)
 library(ggridges)
+library(truncnorm)
 
 # Note: simulation isolated in sims.R
 Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
@@ -177,31 +178,35 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
       tau = rexp(1,recoveryrate) + inittime # adjusted for initcohort timing exp dist of factor of IIP -> this case timing of infection
       ###print(paste0("The IIP for init cohort individual ", i, " is determined by tau = ", tau, " which is adjusted by init cohort timing."))
       
+      # Provide function of IIP
+      punctconstant = 1/sqrt(2*pi*(sigma^2))
+      punctfun = function(t) {punctconstant*exp(-((t - tau)^2/(2*(sigma)^2)))}
   
       # APPLY SURVIVAL ANALYSIS TO QUEUEDATA
-      # Everyone is considered to have interacted right?
-      if (nrow(interacts) == 0){
+      # Everyone is considered to have interacted...
+      if (nrow(queuedata) == 0){
         ###print(paste0("NOTE: No infectious interactions for initcohort member ", i, " so moving on..."))
         next
       } else {
         # Poisson process over length of overlap to determine number of possible hits then draw from a uniform to determine when they are
-        for (z in 1:nrow(interacts)){
+        for (z in 1:nrow(queuedata)){
           # Draw from Poisson 
-          hitrate = transmissionrate*(interacts[z,4] - interacts[z,3])
+          intpunct = integrate(punctfun,queuedata[z,2],queuedata[z,4])
+          hitrate <- intpunct$value
           if (is.na(hitrate)){
             stop("ERROR in hitrate NA!")
           }
           hits = rpois(1,hitrate)
-          ###print(paste0("Interaction ", interacts[z,1], " aquired ", hits, " hits with a rate of ", hitrate, "."))
+          ###print(paste0("Interaction ", queuedata[z,1], " aquired ", hits, " hits with a rate of ", hitrate, "."))
           if (hits == 0){
             next
           } else {
-            # Draw from Uniform
-            timing = runif(hits,interacts[z,3],interacts[z,4])
+            # Sample between arrival and departure for corresponding IIP rtnorm(n, a = lower_bound, b = upper_bound, mean = mu, sd = sigma)
+            timing = rtruncnorm(hits,queuedata[z,2],queuedata[z,4],tau,sigma)
             # First hit to occur sequentially is the timing of secondary infection
             sortedtiming = sort(timing)
             secondaryinf = sortedtiming[1]
-            ###print(paste0("Interaction ", interacts[z,1]," produced a secondary infection at time ", secondaryinf, " during a ", interacts[z,2], " overlap from time ", interacts[z,3]," to ", interacts[z,4], "."))
+            ###print(paste0("Interaction ", queuedata[z,1]," produced a secondary infection at time ", secondaryinf, " during a ", queuedata[z,2], " overlap from time ", queuedata[z,3]," to ", queuedata[z,4], "."))
             output = data.frame(
               icmnumber = i,
               icmtime = inittime, #vector[i],
