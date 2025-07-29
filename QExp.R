@@ -8,7 +8,7 @@ library(ggridges)
 library(truncnorm)
 
 # Note: simulation isolated in sims.R
-Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
+Qexp <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
   
   # PARAMETERS:
   # iterations - number of overall simulations performed
@@ -173,15 +173,12 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
       
       # END QUEUE  ----------------------------------------------------------------------------------------------------------------------------
       
-      # DRAW + APPLY IIP (PUNCT) ==============================================================================================================
+      # DRAW + APPLY IIP (EXP) ==============================================================================================================
       
-      tau = rexp(1,recoveryrate) + inittime # adjusted for initcohort timing exp dist of factor of IIP -> this case timing of infection
-      ###print(paste0("The IIP for init cohort individual ", i, " is determined by tau = ", tau, " which is adjusted by init cohort timing."))
-      
+      # No tau needed for this case
       # Provide function of IIP
-      punctconstant = 1/sqrt(2*pi*(sigma^2))
-      punctfun = function(t) {punctconstant*exp(-((t - tau)^2/(2*(sigma)^2)))}
-  
+      expfun = function(t) {transmissionrate*exp(-recoveryrate*t)}
+      
       # APPLY SURVIVAL ANALYSIS TO QUEUEDATA
       # Everyone is considered to have interacted...
       if (nrow(queuedata) == 0){
@@ -191,8 +188,8 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
         # Poisson process over length of overlap to determine number of possible hits then draw from a uniform to determine when they are
         for (z in 1:nrow(queuedata)){
           # Draw from Poisson 
-          intpunct = integrate(punctfun,queuedata[z,2],queuedata[z,4])
-          hitrate <- intpunct$value
+          intexp = integrate(expfun,queuedata[z,2],queuedata[z,4])
+          hitrate <- intexp$value
           if (is.na(hitrate)){
             stop("ERROR in hitrate NA!")
           }
@@ -203,12 +200,12 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
           } else {
             # Sample between arrival and departure for corresponding IIP 
             # bounds of interval eval at cdf
-            cdflow = pnorm(queuedata[z,2],tau,sigma)
-            cdfhigh = pnorm(queuedata[z,4],tau,sigma)
+            cdflow = pexp(queuedata[z,2],recoveryrate)
+            cdfhigh = pexp(queuedata[z,4],recoveryrate)
             # draw from uniform
             u = runif(hits,cdflow,cdfhigh)
             # apply inverse cdf
-            timing = qnorm(u,tau,sigma)
+            timing = qexp(u,recoveryrate)
             # First hit to occur sequentially is the timing of secondary infection
             sortedtiming = sort(timing)
             secondaryinf = sortedtiming[1]
@@ -324,7 +321,7 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
     geom_density(data = theoretical, aes(x = dist), color = "black", linetype = "longdash", linewidth = 1.2) +
     theme_minimal() +
     labs(
-      title = "Punct Density of Generation Intervals Distribution by Simulation",
+      title = "Exp Density of Generation Intervals Distribution by Simulation",
       x = "Generation Interval",
       y = "Density",
       color = "Simulation"
@@ -339,7 +336,7 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
     theme_ipsum() +
     theme() +
     labs(
-      title = "Punct Generation Interval Distributions by Simulation",
+      title = "Exp Generation Interval Distributions by Simulation",
       x = "Generation Interval Length",
       y = "Number of Secondary Infections"
     ) +
@@ -353,7 +350,7 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
     stat_bin(data = theoretical, aes(x = dist, y = after_stat(count / max(count))), fill = "black", color = NA, alpha = 0.4, binwidth = mybinsize, position = "identity") + # Normalize theoretical
     theme_ipsum() +
     labs(
-      title = "Punct Normalized Generation Interval Distributions by Simulation",
+      title = "Exp Normalized Generation Interval Distributions by Simulation",
       x = "Generation Interval",
       y = "Normalized Number of Secondary Infections"
     ) +
@@ -366,7 +363,7 @@ Qpunct <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionra
     geom_histogram(data = theoretical, aes(x = dist, y = after_stat(density * width)), fill = "black", color = NA, alpha = 0.4, binwidth = mybinsize) +
     theme_ipsum() +
     labs(
-      title = "Punct Relative Generation Interval Distributions by Simulation",
+      title = "Exp Relative Generation Interval Distributions by Simulation",
       x = "Generation Interval",
       y = "Relative Secondary Infections"
     ) +
