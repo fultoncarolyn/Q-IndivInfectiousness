@@ -174,7 +174,8 @@ Qpwise <- function(iterations,initcohorttype,initcohortsize,transmissionrate,rec
       
       # DRAW + APPLY IIP (PWISE) ==============================================================================================================
       
-      tau1 = rexp(1,recoveryrate) + inittime # adjusted for initcohort timing exp dist of factor of IIP -> this case timing of infection
+      # SIR tau1 = 0 and SEIR tau1 = rexp(1,recoveryrate) 
+      tau1 = 0 + inittime # adjusted for initcohort timing exp dist of factor of IIP -> this case timing of infection
       tau2 = tau1 + rexp(1,recoveryrate)
       ###print(paste0("The IIP for init cohort individual ", i, " is determined by tau1 = ", tau1, " and tau2 = ", tau2," which is adjusted by init cohort timing."))
       
