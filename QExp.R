@@ -8,7 +8,7 @@ library(ggridges)
 library(truncnorm)
 
 # Note: simulation isolated in sims.R
-Qexp <- function(iterations,initcohorttype,initcohortsize,sigma,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
+Qexp <- function(iterations,initcohorttype,initcohortsize,transmissionrate,recoveryrate,arrivalrate,departrate,maxtimeval,maxprox){
   
   # PARAMETERS:
   # iterations - number of overall simulations performed
